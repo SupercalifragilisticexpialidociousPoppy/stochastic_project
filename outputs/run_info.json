@@ -1,0 +1,35 @@
+{
+  "run_at": "2026-11-06T17:30:28",
+  "primary": "RELIANCE.NS",
+  "T_default": 0.25,
+  "n_default": 500,
+  "stocks": {
+    "RELIANCE.NS": {
+      "ticker": "RELIANCE.NS",
+      "S0": 1320.0,
+      "sigma": 0.24018814786656056,
+      "r": 0.06100102155739891,
+      "as_of": "2026-11-06",
+      "n_obs": 249,
+      "status": "FRESH (downloaded, cache updated)"
+    },
+    "SUNPHARMA.NS": {
+      "ticker": "SUNPHARMA.NS",
+      "S0": 1860.0,
+      "sigma": 0.1959011248597471,
+      "r": 0.06100102155739891,
+      "as_of": "2026-11-06",
+      "n_obs": 249,
+      "status": "FRESH (downloaded, cache updated)"
+    },
+    "ADANIENT.NS": {
+      "ticker": "ADANIENT.NS",
+      "S0": 2745.800048828125,
+      "sigma": 0.37478968470261986,
+      "r": 0.06100102155739891,
+      "as_of": "2026-11-06",
+      "n_obs": 249,
+      "status": "FRESH (downloaded, cache updated)"
+    }
+  }
+}
