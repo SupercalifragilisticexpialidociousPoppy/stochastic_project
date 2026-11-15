@@ -154,6 +154,8 @@ We use the RBI 364-day Treasury Bill yield of $6.29\%$ (October 2026) \cite{rbit
 \end{equation}
 The same $r$ is used in both models. Using a different convention in the two models would produce a spurious gap that does not shrink as $n$ grows.
 
+\paragraph{Limitations of the rate input.} The rate is a single constant typed into \texttt{data.py}; it is not downloaded with the prices. Yahoo Finance, which supplies the prices, carries only US Treasury yields, which are not appropriate for NSE-listed stocks. For India we found no free, stable programmatic source of the T-bill yield: the RBI publishes auction results on its website without an API, so reading them would mean scraping pages whose layout can change, and the monthly Indian T-bill series we know of from international aggregators lags by months. A failed automatic fetch could also silently change every number in the report. The rate is therefore fixed at the value above, and a different yield (in percent per year) can be supplied when running the code, for example \texttt{python compare.py --rate 6.5}. The yield also changes with time and with the bill's maturity; our default is a 364-day yield used for options of up to one year, whereas a 91-day bill would match the three-month default maturity more closely. Both models always receive the same $r$, so the convergence behaviour reported below does not depend on this choice, but absolute prices do shift slightly with it.
+
 \subsection{Resulting inputs}
 
 \begin{table}[htbp]
@@ -180,10 +182,10 @@ Because the data are downloaded afresh, the numbers in this report correspond to
 %% ------------------------------------------------------------------
 \section{Implementation}\label{sec:impl}
 
-The code is four Python scripts (Python 3.10, NumPy, SciPy, pandas, matplotlib, yfinance), described in full in \texttt{README.md}.
+The code is four Python scripts (Python 3.10, NumPy, SciPy, pandas, matplotlib, yfinance), described in full in \texttt{desc.md}.
 
 \begin{description}
-  \item[\texttt{data.py}] downloads prices, estimates $S_0$ and $\hat\sigma$ by \eqref{eq:vol}, and holds the converted rate \eqref{eq:rate}. A successful download is validated (non-empty, at least 200 rows, positive prices, a recent last date) and overwrites a local CSV cache; if the download fails, the cached CSV is used instead and the script reports which of the two happened.
+  \item[\texttt{data.py}] downloads prices, estimates $S_0$ and $\hat\sigma$ by \eqref{eq:vol}, and holds the converted rate \eqref{eq:rate}, which can be overridden with the \texttt{--rate} option. A successful download is validated (non-empty, at least 200 rows, positive prices, a recent last date) and overwrites a local CSV cache; if the download fails, the cached CSV is used instead and the script reports which of the two happened.
   \item[\texttt{black\_scholes.py}] implements \eqref{eq:bs-call}--\eqref{eq:parity}. The functions are vectorised, so a whole range of strikes or volatilities is priced in one call.
   \item[\texttt{binomial.py}] implements the CRR tree. Only the terminal layer of stock prices is built, using $S_{n,j} = S_0 e^{\sigma\sqrt{\Delta t}(2j-n)}$, and the recursion \eqref{eq:backward} is applied to a NumPy array whose length shrinks by one at each step. The full two-dimensional tree is never stored, so memory is $O(n)$ and time is $O(n^2)$ arithmetic. A separate function keeps the full lattice for small $n$, used for the example below.
   \item[\texttt{compare.py}] runs all experiments and writes every figure and table of this report to \texttt{outputs/}.
@@ -331,7 +333,7 @@ The BS formula takes about $70\ \mu$s per price, independent of $n$. The binomia
 \section{Limitations}\label{sec:limitations}
 
 \begin{itemize}
-  \item \textbf{Constant volatility and rate.} Both models assume that $\sigma$ and $r$ are constant over the option's life. Real volatility changes over time, and Adani Enterprises in particular has shocks driven by news that GBM does not capture.
+  \item \textbf{Constant volatility and rate.} Both models assume that $\sigma$ and $r$ are constant over the option's life. The rate is a fixed input (default $6.29\%$, overridable with \texttt{--rate}) rather than an automatically fetched current value, and it is not matched to each option's maturity (see Section~\ref{sec:data}). Real volatility changes over time, and Adani Enterprises in particular has shocks driven by news that GBM does not capture.
   \item \textbf{Historical volatility.} $\hat\sigma$ is estimated from one year of past prices. It depends on the window used, and is not the volatility implied by market option prices.
   \item \textbf{Log-normal returns.} GBM implies thin tails; real returns have fatter tails and jumps.
   \item \textbf{European exercise only.} We priced neither American options nor options on dividend-paying stocks explicitly (dividends enter only through the adjusted price history).
@@ -351,7 +353,7 @@ We implemented the Black--Scholes formula and the Cox--Ross--Rubinstein binomial
   \item Black--Scholes costs about $70\ \mu$s per price regardless of accuracy, whereas the tree needs about $2.3$ ms for $n = 1000$; for plain European options the formula is therefore faster and exact, and the tree is useful mainly as a base for extensions the formula cannot handle.
 \end{enumerate}
 
-\textbf{Reproducibility.} All figures and tables are regenerated by running \texttt{python compare.py} in the project folder; the data used are recorded in \texttt{outputs/run\_info.json}.
+\textbf{Reproducibility.} All figures and tables are regenerated by running \texttt{python compare.py} in the project folder (add \texttt{--rate PERCENT} to use a different risk-free yield); the data used are recorded in \texttt{outputs/run\_info.json}.
 
 \bibliographystyle{plain}
 \bibliography{refs}

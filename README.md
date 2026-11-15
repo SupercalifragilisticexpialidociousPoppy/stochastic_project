@@ -63,6 +63,8 @@ The option price is the value at the root.
 - **Prices:** one year of daily adjusted closes from Yahoo Finance via `yfinance` (249 days up to 6 Nov 2026). The last close is `S0`.
 - **Volatility:** `σ = std(daily log returns) × √252`. This is a historical volatility, not an implied one.
 - **Risk-free rate:** the RBI 364-day T-bill yield of 6.29%, converted to a continuously compounded rate, `r = ln(1.0629) = 0.0610`. Both models use the same `r`.
+
+  **Limitations of the rate:** `r` is a fixed constant, not downloaded with the prices. Yahoo Finance only carries US Treasury yields, which don't suit NSE stocks. We found no free, stable API for the Indian T-bill yield: the RBI publishes auction results on its website without an API (scraping would break whenever the page layout changes), and the monthly series on international sites lags by months. A failed automatic fetch could also silently change every result. So the default stays at 6.29%, and you can supply another yield with `--rate` (see section 9). The 364-day yield is also not matched to each option's maturity; a 91-day bill would suit the 3-month default better. Both models always get the same `r`, so the convergence results don't depend on it, but absolute prices shift a little.
 - **Defaults:** `T = 0.25` years, strike `K = m·S0` (at the money means `m = 1`), `n = 500`. Stocks are compared by *relative* error because all prices scale with `S0`.
 
 | Stock | S0 (INR) | σ |
@@ -160,7 +162,7 @@ The tree costs O(n²) in theory, but the fitted slope for `n ≥ 100` is only ab
 
 ## 7. Limitations
 
-- Constant volatility and rate; Adani in particular has news-driven shocks that GBM does not capture.
+- Constant volatility and rate. The rate is a fixed input (default 6.29%, overridable with `--rate`), not an automatically fetched current value, and it is not matched to each maturity. Adani in particular has news-driven shocks that GBM does not capture.
 - Historical volatility from one year of prices, not implied volatility.
 - Log-normal returns: thin tails, no jumps.
 - European exercise only; dividends enter only through adjusted prices.
@@ -182,7 +184,9 @@ pip install -r requirements.txt
 python compare.py
 ```
 
-`compare.py` downloads fresh prices (falling back to the CSVs in `data/` if Yahoo Finance is unavailable) and regenerates every figure and table in `outputs/`. Individual files can also be run to see their self-tests: `python black_scholes.py`, `python binomial.py`, `python data.py`.
+`compare.py` downloads fresh prices (falling back to the CSVs in `data/` if Yahoo Finance is unavailable) and regenerates every figure and table in `outputs/`. To use a different risk-free yield (annual, in percent), add `--rate`. For example `python compare.py --rate 6.5` uses 6.5%. The default is 6.29% and the value must be in (0, 30]. The rate used is recorded per stock in `outputs/run_info.json`. Note that the numbers in this README and the report come from the default rate and the 6 Nov 2026 data, and a rerun downloads fresh prices, so they will shift.
+
+Individual files can also be run to see their self-tests: `python black_scholes.py`, `python binomial.py`, `python data.py`.
 
 ## 10. Repository layout
 

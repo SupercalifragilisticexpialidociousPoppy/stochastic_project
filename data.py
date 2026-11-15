@@ -14,8 +14,9 @@ import pandas as pd
 TICKERS = ["RELIANCE.NS", "SUNPHARMA.NS", "ADANIENT.NS"]
 HISTORY_PERIOD = "1y"
 TRADING_DAYS = 252
-TBILL_YIELD = 0.0629                            # RBI 364-day T-bill, annual
+TBILL_YIELD = 0.0629                            # default: RBI 364-day T-bill, annual
 RISK_FREE_RATE = math.log(1 + TBILL_YIELD)      # continuously compounded
+MAX_RATE_PERCENT = 30.0                         # sanity cap for --rate
 DATA_DIR = Path(__file__).parent / "data"
 MIN_ROWS = 200
 MAX_STALENESS_DAYS = 7
@@ -95,29 +96,59 @@ def current_price(prices):
     return float(prices.iloc[-1])
 
 
-def get_inputs(ticker):
+def rate_from_percent(percent):
+    """Continuously compounded r from an annual yield quoted in percent (6.29 -> 0.06100)."""
+    if not (0 < percent <= MAX_RATE_PERCENT):
+        raise ValueError(f"rate must be in (0, {MAX_RATE_PERCENT:g}] percent per year, got {percent}")
+    return math.log(1 + percent / 100)
+
+
+def add_rate_argument(parser):
+    parser.add_argument("--rate", type=float, default=None, metavar="PERCENT",
+                        help="annual risk-free yield in percent, e.g. 6.29 "
+                             f"(default: {TBILL_YIELD:.2%} RBI 364-day T-bill)")
+
+
+def resolve_rate(percent=None):
+    """(r, label) for an optional user-supplied yield in percent."""
+    if percent is None:
+        return RISK_FREE_RATE, f"default {TBILL_YIELD:.2%} RBI 364-day T-bill"
+    return rate_from_percent(percent), f"user-supplied {percent:g}% via --rate"
+
+
+def get_inputs(ticker, rate_percent=None):
     prices, status = get_prices(ticker)
+    r, rate_source = resolve_rate(rate_percent)
     return {
         "ticker": ticker,
         "S0": current_price(prices),
         "sigma": estimate_volatility(prices),
-        "r": RISK_FREE_RATE,
+        "r": r,
+        "rate_source": rate_source,
         "as_of": str(prices.index[-1].date()),
         "n_obs": int(len(prices)),
         "status": status,
     }
 
 
-def main():
+def main(rate_percent=None):
     print(f"{'Ticker':<13}{'As of':<12}{'S0':>10}{'sigma':>9}{'n_obs':>7}  Status")
     for t in TICKERS:
         try:
-            i = get_inputs(t)
+            i = get_inputs(t, rate_percent)
             print(f"{t:<13}{i['as_of']:<12}{i['S0']:>10.2f}{i['sigma']:>9.4f}{i['n_obs']:>7}  {i['status']}")
         except RuntimeError as exc:
             print(f"{t:<13}ERROR: {exc}")
-    print(f"Risk-free rate r = {RISK_FREE_RATE:.5f} (continuous, from {TBILL_YIELD:.2%} RBI 364-day T-bill)")
+    r, source = resolve_rate(rate_percent)
+    print(f"Risk-free rate r = {r:.5f} (continuous; {source})")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    ap = argparse.ArgumentParser(description="Show market inputs for each ticker.")
+    add_rate_argument(ap)
+    args = ap.parse_args()
+    try:
+        main(args.rate)
+    except ValueError as exc:
+        ap.error(str(exc))

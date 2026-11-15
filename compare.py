@@ -1,6 +1,7 @@
 """Run every experiment (E1-E8), save figures and tables to outputs/.
 
-Usage:  python compare.py
+Usage:  python compare.py [--rate PERCENT]
+        --rate  annual risk-free yield in percent (default 6.29, RBI 364-day T-bill)
 Figures: outputs/figures/<name>.pdf and .png   Tables: outputs/tables/<name>.csv and .tex
 """
 import json
@@ -310,13 +311,13 @@ def run_price_history():
 
 
 # ------------------------------------------------------------------------- main
-def main():
+def main(rate_percent=None):
     t0 = time.time()
     setup_dirs()
     inputs = {}
     for t in data.TICKERS:
         try:
-            inputs[t] = data.get_inputs(t)
+            inputs[t] = data.get_inputs(t, rate_percent)
             print(f"{t}: {inputs[t]['status']}")
         except RuntimeError as exc:
             print(f"WARNING: skipping {t}: {exc}")
@@ -336,4 +337,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    ap = argparse.ArgumentParser(description="Run all experiments and write outputs/.")
+    data.add_rate_argument(ap)
+    args = ap.parse_args()
+    try:
+        data.resolve_rate(args.rate)
+    except ValueError as exc:
+        ap.error(str(exc))
+    main(args.rate)

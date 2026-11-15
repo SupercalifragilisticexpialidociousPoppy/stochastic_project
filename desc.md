@@ -28,6 +28,7 @@ python data.py           # refresh market data (falls back to cached CSVs if off
 python black_scholes.py  # self-checks for the BS model
 python binomial.py       # self-checks for the binomial model
 python compare.py        # run all experiments -> outputs/
+python compare.py --rate 6.5   # same, with a 6.5% risk-free yield instead of the default 6.29%
 ```
 
 `compare.py` calls `data.py` itself, so in practice `python compare.py` is the only command you need.
@@ -119,6 +120,7 @@ stochastic/
 | `TRADING_DAYS` | `252` | trading days per year, used to annualise volatility |
 | `TBILL_YIELD` | `0.0629` | RBI 364-day Treasury Bill yield (Oct 2026), annual |
 | `RISK_FREE_RATE` | `math.log(1 + TBILL_YIELD)` ≈ `0.06100` | the same rate as a **continuously compounded** rate, which is the convention both BS and CRR use (`e^{-rT}`) |
+| `MAX_RATE_PERCENT` | `30.0` | sanity cap for the `--rate` option (see 4.5) |
 | `DATA_DIR` | `Path(__file__).parent / "data"` | cache folder |
 | `MIN_ROWS` | `200` | sanity threshold: fewer rows than this counts as a bad download |
 | `MAX_STALENESS_DAYS` | `7` | a download whose last row is older than this counts as stale |
@@ -163,6 +165,30 @@ get_prices(ticker):
 - `compare.py` records the exact data used in `outputs/run_info.json` (status, `as_of` date, S0, σ, r per ticker), and the report quotes that `as_of` date.
 - Do the **final** `python compare.py` run just before writing the report, then don't rerun it, or rerun and refresh the numbers in the report.
 
+### 4.5 The `--rate` option (overriding the risk-free rate)
+
+`r` is a constant (`RISK_FREE_RATE`, default 6.29% annual). It is **not fetched automatically**, because there is no free, stable API for the Indian T-bill yield: Yahoo Finance (via `yfinance`) only has US yields (`^IRX`, `^TNX`), the RBI publishes auction results on a web page with no API (scraping breaks when the layout changes), and the monthly Indian series on international aggregators lags by months. A silent fetch failure would also change every result, so we keep a documented constant plus a manual override.
+
+| Item | Detail |
+|---|---|
+| Syntax | `python compare.py --rate 6.5` or `python data.py --rate 6.5` |
+| Meaning | the **annual** yield **in percent** (6.5 means 6.5%, not 0.065) |
+| Conversion | `r = ln(1 + percent/100)`, the same continuous-compounding rule as the default |
+| Valid range | `0 < percent <= 30`; anything else exits with an error and usage message |
+| Default | omit `--rate` to use `TBILL_YIELD = 0.0629` |
+| Recorded in | each ticker's entry in `outputs/run_info.json` has `r` and `rate_source` (default or user-supplied) |
+
+Functions added for this:
+
+| Function | Purpose |
+|---|---|
+| `rate_from_percent(percent)` | validates the yield and returns the continuous rate |
+| `resolve_rate(percent=None)` | returns `(r, label)`; default constant when `percent` is `None` |
+| `add_rate_argument(parser)` | adds `--rate` to an `argparse` parser (shared by `data.py` and `compare.py`) |
+| `get_inputs(ticker, rate_percent=None)` | now takes the optional yield and puts `r` and `rate_source` in the returned dict |
+
+Both models always receive the same `r` from the inputs dict. Changing the rate shifts absolute prices slightly but not the convergence behaviour. Note that a run without `--rate` still uses 6.29%, which is what the report's numbers were produced with.
+
 ### 4.4 Example output of `python data.py`
 
 ```
@@ -171,7 +197,7 @@ RELIANCE.NS   FRESH (downloaded, cache updated)             2026-11-06   1452.30
 SUNPHARMA.NS  FRESH (downloaded, cache updated)             2026-11-06   1860.00    0.1959   249
 ADANIENT.NS   CACHED (download failed: empty response;      2026-11-05   2398.10    0.3920   248
               using data up to 2026-11-05)
-Risk-free rate r = 0.06100 (continuous, from 6.29% RBI 364-day T-bill)
+Risk-free rate r = 0.06100 (continuous; default 6.29% RBI 364-day T-bill)
 ```
 
 The numbers above are illustrative, not real.
@@ -264,7 +290,7 @@ The binomial self-check imports `black_scholes` **only inside the `__main__` blo
 
 ## 7. `compare.py`: experiments, figures, tables
 
-**Job:** load the market inputs, run every experiment, and save every figure and table used in the slides and report. Running `python compare.py` regenerates all of `outputs/`.
+**Job:** load the market inputs (accepting an optional `--rate PERCENT`, see `data.py` §4.5), run every experiment, and save every figure and table used in the slides and report. Running `python compare.py` regenerates all of `outputs/`.
 
 **Imports:** `json`, `time`, `timeit`, `pathlib`, `datetime`, `numpy`, `pandas`, `matplotlib` (with `matplotlib.use("Agg")` before importing `pyplot`), plus `data`, `black_scholes` and `binomial`.
 
@@ -295,7 +321,7 @@ The binomial self-check imports `black_scholes` **only inside the `__main__` blo
 | `save_table(df, name, caption)` | saves `outputs/tables/<name>.csv` and `<name>.tex` using `df.to_latex(index=False, float_format="%.4f", caption=caption, label=f"tab:{name}")` |
 | `time_call(fn, repeats)` | runs `timeit.repeat(fn, number=k, repeat=repeats)`, picking `k` so one batch takes about 0.2 s, and returns the median seconds per call |
 | `abs_err(a, b)`, `rel_err(a, b)` | `|a − b|` and `|a − b| / b` |
-| `write_run_info(inputs)` | dumps `outputs/run_info.json` with the run timestamp, plus status, as_of, S0, σ, r and n_obs per ticker |
+| `write_run_info(inputs)` | dumps `outputs/run_info.json` with the run timestamp, plus status, as_of, S0, σ, r, rate_source and n_obs per ticker |
 
 ### 7.3 Experiments
 
@@ -381,7 +407,7 @@ NODE_PATH=$PWD/node_modules node make_deck.js
 |---|---|
 | Time `T` | years (3 months = 0.25) |
 | Volatility `sigma` | annualised, as a decimal (0.22 = 22%) |
-| Rate `r` | continuously compounded, as a decimal; always `data.RISK_FREE_RATE` |
+| Rate `r` | continuously compounded, as a decimal; `data.RISK_FREE_RATE` by default, or the `--rate` value (see 4.5) |
 | Prices | INR, adjusted close |
 | `option` argument | the string `"call"` or `"put"` |
 | Errors | absolute error in INR; **relative error** (fraction of the BS price) when comparing stocks |
