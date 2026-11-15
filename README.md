@@ -156,7 +156,7 @@ The tree costs O(n²) in theory, but the fitted slope for `n ≥ 100` is only ab
 ## 6. Discussion
 
 - **Accuracy:** everything is consistent with first-order convergence. Halving the error means doubling `n`.
-- **Speed vs flexibility:** for European options with constant `σ` and `r`, BS is exact within the model and about 34× cheaper than a 1000-step tree, so the tree has no advantage here. The tree's value is that the backward step can be modified, for example for early exercise or discrete dividends. As an example, `binomial_price_american` prices an American put by taking `max(continuation, K − S)` at each node: for the at-the-money Reliance put (n = 1000) it gives 54.99 INR against 53.23 for the European, an early-exercise premium of 3.3% (9.8% with one year to maturity).
+- **Speed vs flexibility:** for European options with constant `σ` and `r`, BS is exact within the model and about 34× cheaper than a 1000-step tree, so the tree has no advantage here. The tree's value is that the backward step can be modified, for example for early exercise or discrete dividends.
 - **What "error" means:** BS is the reference because it is exact under the GBM assumption. The error reported is the tree's discretisation error, not an error against real market option prices.
 - **Averaging `n` and `n + 1`:** this cancels most of the oscillation. At the money the call error falls from 0.158 to 0.0033 INR at `n = 100` (48× smaller), better than a single 200-step tree (0.079). Away from the money the gain is irregular (4–14× at `n = 500`, and sometimes worse), because averaging does not remove the error from where the strike sits between the terminal nodes.
 
@@ -165,7 +165,7 @@ The tree costs O(n²) in theory, but the fitted slope for `n ≥ 100` is only ab
 - Constant volatility and rate. The rate is a fixed input (default 6.29%, overridable with `--rate`), not an automatically fetched current value, and it is not matched to each maturity. Adani in particular has news-driven shocks that GBM does not capture.
 - Historical volatility from one year of prices, not implied volatility.
 - Log-normal returns: thin tails, no jumps.
-- Mostly European exercise (one American put example); dividends enter only through adjusted prices.
+- European exercise only; dividends enter only through adjusted prices.
 - Two models compared with each other; no market option prices were used.
 - Three stocks and one date; timings depend on the machine.
 
@@ -182,7 +182,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python compare.py
-python extensions.py   # E9-E11: averaging, large-n timing, American put
+python extensions.py   # E9-E10: averaging n and n+1, large-n timing
 ```
 
 `compare.py` downloads fresh prices (falling back to the CSVs in `data/` if Yahoo Finance is unavailable) and regenerates every figure and table in `outputs/`. To use a different risk-free yield (annual, in percent), add `--rate`. For example `python compare.py --rate 6.5` uses 6.5%. The default is 6.29% and the value must be in (0, 30]. The rate used is recorded per stock in `outputs/run_info.json`. Note that the numbers in this README and the report come from the default rate and the 6 Nov 2026 data, and a rerun downloads fresh prices, so they will shift.
@@ -193,7 +193,7 @@ Individual files can also be run to see their self-tests: `python black_scholes.
 
 ```
 data.py  black_scholes.py  binomial.py  compare.py   the code
-extensions.py         E9-E11 on the same inputs as the report (no download)
+extensions.py         E9-E10 on the same inputs as the report (no download)
 data/                 cached price CSVs, one per stock
 outputs/figures/      all figures (.pdf and .png)
 outputs/tables/       all tables (.csv and .tex), plus outputs/run_info.json
