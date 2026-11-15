@@ -151,14 +151,14 @@ Rupee errors differ a lot because share prices differ. Relative errors are withi
 
 ![Timing](outputs/figures/e7_timing.png)
 
-The tree costs O(n²) in theory, but the fitted slope for `n ≥ 100` is only about 1.1. Each step is a single NumPy operation, so up to `n = 1000` the fixed Python overhead per step dominates. We expect the slope to approach 2 for much larger `n` but did not test it.
+The tree costs O(n²) in theory, but the fitted slope for `n ≥ 100` is only about 1.1. Each step is a single NumPy operation, so up to `n = 1000` the fixed Python overhead per step dominates. Extending the sweep to `n = 16000` (`extensions.py`) gives a slope of about 2.1 for `n ≥ 4000`, so the cost does become O(n²) once the arithmetic outweighs the per-step overhead.
 
 ## 6. Discussion
 
 - **Accuracy:** everything is consistent with first-order convergence. Halving the error means doubling `n`.
-- **Speed vs flexibility:** for European options with constant `σ` and `r`, BS is exact within the model and about 34× cheaper than a 1000-step tree, so the tree has no advantage here. The tree's value is that the backward step can be modified, for example for early exercise or discrete dividends. We did not test such extensions.
+- **Speed vs flexibility:** for European options with constant `σ` and `r`, BS is exact within the model and about 34× cheaper than a 1000-step tree, so the tree has no advantage here. The tree's value is that the backward step can be modified, for example for early exercise or discrete dividends.
 - **What "error" means:** BS is the reference because it is exact under the GBM assumption. The error reported is the tree's discretisation error, not an error against real market option prices.
-- **Untested ideas:** averaging the prices for `n` and `n + 1` should largely cancel the oscillation.
+- **Averaging `n` and `n + 1`:** this cancels most of the oscillation. At the money the call error falls from 0.158 to 0.0033 INR at `n = 100` (48× smaller), better than a single 200-step tree (0.079). Away from the money the gain is irregular (4–14× at `n = 500`, and sometimes worse), because averaging does not remove the error from where the strike sits between the terminal nodes.
 
 ## 7. Limitations
 
@@ -182,6 +182,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python compare.py
+python extensions.py   # E9-E10: averaging n and n+1, large-n timing
 ```
 
 `compare.py` downloads fresh prices (falling back to the CSVs in `data/` if Yahoo Finance is unavailable) and regenerates every figure and table in `outputs/`. To use a different risk-free yield (annual, in percent), add `--rate`. For example `python compare.py --rate 6.5` uses 6.5%. The default is 6.29% and the value must be in (0, 30]. The rate used is recorded per stock in `outputs/run_info.json`. Note that the numbers in this README and the report come from the default rate and the 6 Nov 2026 data, and a rerun downloads fresh prices, so they will shift.
@@ -192,6 +193,7 @@ Individual files can also be run to see their self-tests: `python black_scholes.
 
 ```
 data.py  black_scholes.py  binomial.py  compare.py   the code
+extensions.py         E9-E10 on the same inputs as the report (no download)
 data/                 cached price CSVs, one per stock
 outputs/figures/      all figures (.pdf and .png)
 outputs/tables/       all tables (.csv and .tex), plus outputs/run_info.json
@@ -206,4 +208,4 @@ prd.md                project plan and decisions
 2. J. C. Cox, S. A. Ross and M. Rubinstein, "Option Pricing: A Simplified Approach", *Journal of Financial Economics* 7(3), 1979.
 3. J. C. Hull, *Options, Futures, and Other Derivatives*, 11th ed., Pearson, 2021.
 4. D. P. J. Leisen and M. Reimer, "Binomial Models for Option Valuation: Examining and Improving Convergence", *Applied Mathematical Finance* 3(4), 1996.
-5. Reserve Bank of India, Treasury Bill auction results (364-day yield of about 6.29%, October 2026).
+5. Reserve Bank of India, "Treasury Bills: Full Auction Result", press release, 7 October 2026 (364-day cut-off yield 6.2869%), https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx?prid=63747

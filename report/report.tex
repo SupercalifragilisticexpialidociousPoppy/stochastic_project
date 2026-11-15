@@ -8,6 +8,7 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{adjustbox}
+\usepackage{float}
 \usepackage{caption}
 \usepackage[hidelinks]{hyperref}
 
@@ -148,7 +149,7 @@ using the sample standard deviation and 252 trading days per year. This is a \em
 
 \subsection{Risk-free rate}
 
-We use the RBI 364-day Treasury Bill yield of $6.29\%$ (October 2026) \cite{rbitbill}. Both models discount with $e^{-rT}$, i.e.\ they use a \emph{continuously compounded} rate, so the quoted annual yield is converted:
+We use the cut-off yield of the 364-day Treasury Bill at the RBI auction of 7 October 2026, $6.2869\%$ \cite{rbitbill}, rounded to $6.29\%$. Both models discount with $e^{-rT}$, i.e.\ they use a \emph{continuously compounded} rate, so the quoted annual yield is converted:
 \begin{equation}\label{eq:rate}
   r = \ln(1 + 0.0629) = 0.06100.
 \end{equation}
@@ -158,7 +159,9 @@ The same $r$ is used in both models. Using a different convention in the two mod
 
 \subsection{Resulting inputs}
 
-\begin{table}[htbp]
+Table~\ref{tab:inputs} lists the spot price $S_0$ and the volatility $\hat\sigma$ from \eqref{eq:vol} for each stock. Adani Enterprises is almost twice as volatile as Sun Pharma, so the three stocks cover a wide range of $\sigma$.
+
+\begin{table}[H]
 \centering
 \caption{Model inputs, from the data downloaded on 6 November 2026 (249 daily closes per stock, $r = 0.06100$).}
 \label{tab:inputs}
@@ -312,7 +315,10 @@ Table~\ref{tab:e7_timing} and Figure~\ref{fig:e7} report the median time to comp
 \label{fig:e7}
 \end{figure}
 
-The BS formula takes about $70\ \mu$s per price, independent of $n$. The binomial price takes about $15\ \mu$s at $n = 5$ (faster than BS in our implementation, because the SciPy normal-distribution call has a fixed overhead), $0.18$ ms at $n = 100$, $1.0$ ms at $n = 500$ and $2.3$ ms at $n = 1000$, about $34$ times the BS time. Theoretically the work grows like $n^2$, but the fitted log--log slope for $n \geq 100$ is only about $1.1$ (Table~\ref{tab:e7_slope}). Each of the $n$ steps is a single vectorised NumPy operation on at most $n+1$ numbers, so for $n \leq 1000$ the fixed cost per Python loop iteration dominates and the cost looks nearly linear. We expect the slope to move towards $2$ for much larger $n$, but did not test this.
+The BS formula takes about $70\ \mu$s per price, independent of $n$. The binomial price takes about $15\ \mu$s at $n = 5$ (faster than BS in our implementation, because the SciPy normal-distribution call has a fixed overhead), $0.18$ ms at $n = 100$, $1.0$ ms at $n = 500$ and $2.3$ ms at $n = 1000$, about $34$ times the BS time. Theoretically the work grows like $n^2$, but the fitted log--log slope for $n \geq 100$ is only about $1.1$ (Table~\ref{tab:e7_slope}). Each of the $n$ steps is a single vectorised NumPy operation on at most $n+1$ numbers, so for $n \leq 1000$ the fixed cost per Python loop iteration dominates and the cost looks nearly linear. To check this we extended the sweep to $n = 16{,}000$ in a separate run (\texttt{extensions.py}, Table~\ref{tab:e10_timing_large_n}): for $n \geq 4000$ the fitted slope is about $2.1$ (Table~\ref{tab:e10_slope}), so once the arithmetic outweighs the fixed cost per step the running time grows like $n^2$, as expected.
+
+\input{../outputs/tables/e10_timing_large_n.tex}
+\input{../outputs/tables/e10_slope.tex}
 
 \input{../outputs/tables/e7_slope.tex}
 
@@ -321,11 +327,20 @@ The BS formula takes about $70\ \mu$s per price, independent of $n$. The binomia
 
 \textbf{Accuracy.} Everything measured here is consistent with the CRR tree converging to Black--Scholes at first order. With $n = 500$ the relative error of an at-the-money call is about $0.04\%$ for all three stocks; to halve the error one must double $n$, which roughly doubles the work in our implementation and quadruples it asymptotically.
 
-\textbf{Oscillation and the choice of $n$.} Because the error changes sign with the parity of $n$, a single binomial price can be above or below the BS price by a similar amount. Averaging the prices for $n$ and $n+1$ would largely cancel this component, although we did not test it.
+\textbf{Oscillation and the choice of $n$.} Because the error changes sign with the parity of $n$, a single binomial price can be above or below the BS price by a similar amount. Averaging the prices for $n$ and $n+1$ cancels most of it (Table~\ref{tab:e9_averaging}, Figure~\ref{fig:e9}). For the at-the-money Reliance call the error falls from $0.158$ to $0.0033$ INR at $n = 100$ (48 times smaller) and from $0.0316$ to $0.00056$ INR at $n = 500$ (56 times smaller). The average costs about two trees, but it still beats a single tree of twice the size: $0.0033$ INR against $0.079$ INR for $n = 200$. Away from the money the gain is smaller and irregular: at $n = 500$ the error falls 14 times for $K = 1.05\,S_0$ and 4 times for $K = 1.1\,S_0$, but at $n = 200$ for $K = 1.05\,S_0$ and at $n = 50$ for $K = 1.1\,S_0$ the average is worse than the plain tree, which happens to be almost exact there. Averaging removes the odd/even alternation, but not the part of the error that comes from where the strike sits between two terminal nodes.
+
+\input{../outputs/tables/e9_averaging.tex}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{e9_averaging}
+\caption{Absolute call error of one tree with $n$ steps and of the average of the $n$- and $(n+1)$-step prices, Reliance, at the money (left) and $K = 1.1\,S_0$ (right).}
+\label{fig:e9}
+\end{figure}
 
 \textbf{Sensitivity to the inputs.} The qualitative behaviour of both models is the same and is the one expected from option theory: call prices fall and put prices rise with the strike, and both prices rise with volatility and maturity. The binomial error grows with $\sigma$ and with $\sqrt{T}$ at fixed $n$, roughly in proportion to the option price, and depends irregularly on the strike.
 
-\textbf{Speed versus flexibility.} For European options under constant $\sigma$ and $r$ the Black--Scholes formula is both exact (within the model) and about $34$ times cheaper than a $1000$-step tree, so the tree has no advantage on this problem. The tree's attraction is that the backward induction \eqref{eq:backward} can be modified at each node, for example to allow early exercise or discrete dividends, where no closed form exists. We did not test such extensions.
+\textbf{Speed versus flexibility.} For European options under constant $\sigma$ and $r$ the Black--Scholes formula is both exact (within the model) and about $34$ times cheaper than a $1000$-step tree, so the tree has no advantage on this problem. The tree's attraction is that the backward induction \eqref{eq:backward} can be modified at each node, for example to allow early exercise or discrete dividends, where no closed form exists.
 
 \textbf{What ``error'' means here.} The BS price is used as the reference because it is the exact price under the GBM assumption. The error we report is therefore the discretisation error of the tree, not the error of either model against actual market option prices, which we did not use.
 
@@ -353,7 +368,7 @@ We implemented the Black--Scholes formula and the Cox--Ross--Rubinstein binomial
   \item Black--Scholes costs about $70\ \mu$s per price regardless of accuracy, whereas the tree needs about $2.3$ ms for $n = 1000$; for plain European options the formula is therefore faster and exact, and the tree is useful mainly as a base for extensions the formula cannot handle.
 \end{enumerate}
 
-\textbf{Reproducibility.} All figures and tables are regenerated by running \texttt{python compare.py} in the project folder (add \texttt{--rate PERCENT} to use a different risk-free yield); the data used are recorded in \texttt{outputs/run\_info.json}.
+\textbf{Reproducibility.} All figures and tables are regenerated by running \texttt{python compare.py} and then \texttt{python extensions.py} (Experiments E9 and E10, on the same inputs) in the project folder (add \texttt{--rate PERCENT} to use a different risk-free yield); the data used are recorded in \texttt{outputs/run\_info.json}.
 
 \bibliographystyle{plain}
 \bibliography{refs}
