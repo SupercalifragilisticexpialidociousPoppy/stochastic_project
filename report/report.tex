@@ -340,17 +340,7 @@ The BS formula takes about $70\ \mu$s per price, independent of $n$. The binomia
 
 \textbf{Sensitivity to the inputs.} The qualitative behaviour of both models is the same and is the one expected from option theory: call prices fall and put prices rise with the strike, and both prices rise with volatility and maturity. The binomial error grows with $\sigma$ and with $\sqrt{T}$ at fixed $n$, roughly in proportion to the option price, and depends irregularly on the strike.
 
-\textbf{Speed versus flexibility.} For European options under constant $\sigma$ and $r$ the Black--Scholes formula is both exact (within the model) and about $34$ times cheaper than a $1000$-step tree, so the tree has no advantage on this problem. The tree's attraction is that the backward induction \eqref{eq:backward} can be modified at each node, for example to allow early exercise or discrete dividends, where no closed form exists. To illustrate, we priced an American put by replacing \eqref{eq:backward} with $V_{i,j} = \max\big(e^{-r\Delta t}[\,pV_{i+1,j+1} + (1-p)V_{i+1,j}\,],\; K - S_{i,j}\big)$ (\texttt{binomial\_price\_american}; on the textbook contract it gives $6.089$, against the standard value of about $6.09$ \cite{hull}). For the at-the-money Reliance put ($n = 1000$) the American price is $54.99$ INR against $53.23$ for the European, an early-exercise premium of $1.76$ INR ($3.3\%$); with one year to maturity the premium is $8.55$ INR ($9.8\%$) (Table~\ref{tab:e11_american}, Figure~\ref{fig:e11}). For a deep in-the-money strike ($K = 1.2\,S_0$, three months) the tree gives exactly $K - S_0 = 264.00$: immediate exercise is optimal. The price converges as $n$ grows ($54.979$, $54.987$, $54.991$ at $n = 500$, $1000$, $2000$; Table~\ref{tab:e11_american_convergence}). Black--Scholes has no closed form for this contract, which is where the tree is worth its extra cost. Without dividends an American call is never exercised early, so its price equals the European one \cite{hull}; the code checks this.
-
-\input{../outputs/tables/e11_american.tex}
-\input{../outputs/tables/e11_american_convergence.tex}
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.75\textwidth]{e11_american}
-\caption{European and American put prices against moneyness for Reliance ($n = 1000$); the American put never falls below the intrinsic value $K - S_0$.}
-\label{fig:e11}
-\end{figure}
+\textbf{Speed versus flexibility.} For European options under constant $\sigma$ and $r$ the Black--Scholes formula is both exact (within the model) and about $34$ times cheaper than a $1000$-step tree, so the tree has no advantage on this problem. The tree's attraction is that the backward induction \eqref{eq:backward} can be modified at each node, for example to allow early exercise or discrete dividends, where no closed form exists.
 
 \textbf{What ``error'' means here.} The BS price is used as the reference because it is the exact price under the GBM assumption. The error we report is therefore the discretisation error of the tree, not the error of either model against actual market option prices, which we did not use.
 
@@ -361,7 +351,7 @@ The BS formula takes about $70\ \mu$s per price, independent of $n$. The binomia
   \item \textbf{Constant volatility and rate.} Both models assume that $\sigma$ and $r$ are constant over the option's life. The rate is a fixed input (default $6.29\%$, overridable with \texttt{--rate}) rather than an automatically fetched current value, and it is not matched to each option's maturity (see Section~\ref{sec:data}). Real volatility changes over time, and Adani Enterprises in particular has shocks driven by news that GBM does not capture.
   \item \textbf{Historical volatility.} $\hat\sigma$ is estimated from one year of past prices. It depends on the window used, and is not the volatility implied by market option prices.
   \item \textbf{Log-normal returns.} GBM implies thin tails; real returns have fatter tails and jumps.
-  \item \textbf{Mostly European exercise.} American options appear only as the put example of Section~\ref{sec:discussion}; options on dividend-paying stocks are not priced explicitly (dividends enter only through the adjusted price history).
+  \item \textbf{European exercise only.} We priced neither American options nor options on dividend-paying stocks explicitly (dividends enter only through the adjusted price history).
   \item \textbf{No market comparison.} We compare two models with each other; no observed option prices were used.
   \item \textbf{One date, three stocks.} All results use data up to 6 November 2026 for three stocks, and timing results depend on the machine and implementation.
 \end{itemize}
@@ -378,7 +368,7 @@ We implemented the Black--Scholes formula and the Cox--Ross--Rubinstein binomial
   \item Black--Scholes costs about $70\ \mu$s per price regardless of accuracy, whereas the tree needs about $2.3$ ms for $n = 1000$; for plain European options the formula is therefore faster and exact, and the tree is useful mainly as a base for extensions the formula cannot handle.
 \end{enumerate}
 
-\textbf{Reproducibility.} All figures and tables are regenerated by running \texttt{python compare.py} and then \texttt{python extensions.py} (Experiments E9--E11, on the same inputs) in the project folder (add \texttt{--rate PERCENT} to use a different risk-free yield); the data used are recorded in \texttt{outputs/run\_info.json}.
+\textbf{Reproducibility.} All figures and tables are regenerated by running \texttt{python compare.py} and then \texttt{python extensions.py} (Experiments E9 and E10, on the same inputs) in the project folder (add \texttt{--rate PERCENT} to use a different risk-free yield); the data used are recorded in \texttt{outputs/run\_info.json}.
 
 \bibliographystyle{plain}
 \bibliography{refs}

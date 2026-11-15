@@ -1,8 +1,7 @@
-"""Extra experiments E9-E11, run on the SAME inputs as the report (outputs/run_info.json).
+"""Extra experiments E9-E10, run on the SAME inputs as the report (outputs/run_info.json).
 
   E9   averaging the prices for n and n+1 (cancels the odd/even oscillation)
   E10  running time for large n (does the slope reach 2?)
-  E11  American put: early exercise on the same CRR tree
 
 Usage:  python extensions.py        (run compare.py first; nothing is downloaded here)
 Figures and tables go to outputs/ with the same helpers as compare.py.
@@ -16,18 +15,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from binomial import binomial_price, binomial_price_american
-from black_scholes import bs_call, bs_put
-from compare import (C_ALT, C_ALT2, C_BIN, C_BS, PRIMARY, ROOT, abs_err, pair, save_fig, save_table,
+from binomial import binomial_price
+from black_scholes import bs_call
+from compare import (C_ALT, C_BIN, PRIMARY, ROOT, abs_err, pair, save_fig, save_table,
                      setup_dirs, time_call)
 
 N_AVG = [10, 50, 100, 200, 500, 1000]
 N_AVG_DENSE = list(range(10, 1001, 10))
 MONEYNESS_AVG = [1.0, 1.05, 1.1]
 N_BIG = [1000, 2000, 4000, 8000, 16000]
-N_AMER = 1000
-MONEYNESS_AMER = [0.9, 1.0, 1.1, 1.2]
-T_AMER = [0.25, 1.0]
 
 
 def load_inputs():
@@ -90,43 +86,11 @@ def run_e10_timing_large_n(inp):
     save_fig(fig, "e10_timing_large_n")
 
 
-def run_e11_american(inp):
-    rows = []
-    for T in T_AMER:
-        for m in MONEYNESS_AMER:
-            S0, K, _, r, sigma = pair(inp, m=m)
-            eu_bs = float(bs_put(S0, K, T, r, sigma))
-            eu = binomial_price(S0, K, T, r, sigma, N_AMER, "put")
-            am = binomial_price_american(S0, K, T, r, sigma, N_AMER, "put")
-            rows.append({"T (years)": T, "K/S0": m, "BS European put": eu_bs, "Binomial European put": eu,
-                         "Binomial American put": am, "Early-exercise premium": am - eu,
-                         "Premium (pct)": 100 * (am - eu) / eu, "Intrinsic K - S0": max(K - S0, 0.0)})
-    save_table(pd.DataFrame(rows), "e11_american",
-               f"American vs European put on {inp['ticker']} (n={N_AMER}); the premium uses the tree "
-               f"European price at the same n.")
-    S0, K, T, r, sigma = pair(inp)
-    conv = pd.DataFrame([{"n": n, "American put": binomial_price_american(S0, K, T, r, sigma, n, "put")}
-                         for n in (100, 250, 500, 1000, 2000)])
-    save_table(conv, "e11_american_convergence", f"ATM American put on {inp['ticker']} (T={T}) against n.")
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    ms = np.linspace(0.8, 1.2, 17)
-    for T, color_eu, color_am in ((0.25, C_BS, C_BIN), (1.0, C_ALT2, C_ALT)):
-        eu = [binomial_price(S0, m * S0, T, r, sigma, N_AMER, "put") for m in ms]
-        am = [binomial_price_american(S0, m * S0, T, r, sigma, N_AMER, "put") for m in ms]
-        ax.plot(ms, eu, "--", color=color_eu, label=f"European, T={T}")
-        ax.plot(ms, am, "-", color=color_am, label=f"American, T={T}")
-    ax.plot(ms, np.maximum(ms * S0 - S0, 0), "k:", lw=1, label="Intrinsic K - S0")
-    ax.set_xlabel("Moneyness K/S0")
-    ax.set_ylabel("Put price (INR)")
-    ax.set_title(f"Early exercise, {inp['ticker']} (n={N_AMER})")
-    ax.legend()
-    save_fig(fig, "e11_american")
-
 
 def main():
     setup_dirs()
     inp = load_inputs()
-    for name, fn in (("E9", run_e9_averaging), ("E10", run_e10_timing_large_n), ("E11", run_e11_american)):
+    for name, fn in (("E9", run_e9_averaging), ("E10", run_e10_timing_large_n)):
         fn(inp)
         print(f"done {name}")
 
