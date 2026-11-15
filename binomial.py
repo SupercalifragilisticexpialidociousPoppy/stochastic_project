@@ -48,6 +48,21 @@ def binomial_price(S0, K, T, r, sigma, n, option="call"):
     return float(V[0])
 
 
+def binomial_price_american(S0, K, T, r, sigma, n, option="put"):
+    """American option on the same CRR tree: at every node the holder may exercise, so
+    V(i, j) = max(continuation value, payoff of exercising now). O(n^2) time, O(n) memory."""
+    if S0 <= 0 or K <= 0 or T <= 0 or sigma <= 0 or n < 1:
+        raise ValueError("S0, K, T, sigma must be > 0 and n >= 1")
+    u, d, p, dt = crr_params(T, r, sigma, n)
+    disc = np.exp(-r * dt)
+    S = terminal_prices(S0, sigma, dt, n)
+    V = payoff(S, K, option)
+    for _ in range(n):
+        S = S[1:] * d                      # stock prices one step earlier: S0 u^(2j-i)
+        V = np.maximum(disc * (p * V[1:] + (1.0 - p) * V[:-1]), payoff(S, K, option))
+    return float(V[0])
+
+
 def binomial_tree_full(S0, K, T, r, sigma, n, option="call"):
     """Full lattices for small n (display only).
 
@@ -94,6 +109,17 @@ def _self_check():
     _, val = binomial_tree_full(S0, K, T, r, sigma, 3)
     check("full tree root equals binomial_price at n=3",
           abs(val[0, 0] - binomial_price(S0, K, T, r, sigma, 3)) < 1e-12)
+    eu = binomial_price(S0, K, T, r, sigma, 500, "put")
+    am = binomial_price_american(S0, K, T, r, sigma, 500, "put")
+    check(f"American put >= European put (got {am:.4f} vs {eu:.4f})", am >= eu - 1e-12)
+    check("deep ITM American put = K - S0 (immediate exercise)",
+          abs(binomial_price_american(S0, 200.0, T, r, sigma, 500, "put") - (200.0 - S0)) < 1e-9)
+    check("American call = European call (no dividends: never exercised early)",
+          abs(binomial_price_american(S0, K, T, r, sigma, 500, "call")
+              - binomial_price(S0, K, T, r, sigma, 500, "call")) < 1e-9)
+    one_step = np.exp(-r * dt) * (pr * max(K - S0 * u, 0) + (1 - pr) * max(K - S0 * d, 0))
+    check("American put at n=1 matches the one-step formula with exercise",
+          abs(binomial_price_american(S0, K, T, r, sigma, 1, "put") - max(one_step, K - S0)) < 1e-12)
     return failures
 
 
